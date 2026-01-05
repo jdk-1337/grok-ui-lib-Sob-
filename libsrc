@@ -1,13 +1,12 @@
--- Grok UI Library - Fixed & Beautiful Modern Dark Edition (January 2026)
+-- Grok UI Library - FINAL FIXED & BEAUTIFUL DARK EDITION (2026)
 -- Loadstring: loadstring(game:HttpGet("https://raw.githubusercontent.com/jdk-1337/grok-ui-lib-Sob-/refs/heads/main/libsrc"))()
 
 local GrokUILib = {}
-GrokUILib.__index = GrokUILib
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 
--- Ultra Clean Dark Theme (exactly the colors you wanted)
+-- Premium Dark Theme (exactly as requested)
 local Theme = {
     Main = Color3.fromRGB(13, 13, 13),
     Secondary = Color3.fromRGB(20, 20, 20),
@@ -22,179 +21,189 @@ local Theme = {
     AnimationSpeed = 0.25
 }
 
--- Create UI Container
-local function CreateUI()
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "GrokModernUI"
-    screen.ResetOnSpawn = false
-    screen.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-    return screen
-end
-
--- Add Rounded Corners
+-- Helper: Add rounded corners
 local function AddCorner(obj, radius)
     local corner = Instance.new("UICorner")
     corner.CornerRadius = radius or Theme.CornerRadius
     corner.Parent = obj
 end
 
--- Button Animations
+-- Helper: Button hover/click animation
 local function AddButtonAnim(btn)
-    local original = btn.BackgroundColor3
+    local originalColor = btn.BackgroundColor3
+    
     btn.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(Theme.AnimationSpeed), {BackgroundColor3 = Theme.Hover}):Play()
     end)
+    
     btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(Theme.AnimationSpeed), {BackgroundColor3 = original}):Play()
+        TweenService:Create(btn, TweenInfo.new(Theme.AnimationSpeed), {BackgroundColor3 = originalColor}):Play()
     end)
+    
     btn.MouseButton1Down:Connect(function()
         TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Theme.Pressed}):Play()
     end)
+    
+    btn.MouseButton1Up:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(Theme.AnimationSpeed), {BackgroundColor3 = Theme.Hover}):Play()
+    end)
 end
 
--- Main Window Creator (NOW FIXED)
+-- Main Function: Create Window with Tabs
 function GrokUILib.CreateWindow(options)
-    local screen = CreateUI()
+    options = options or {}
+    
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "GrokPremiumUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
     
     local window = Instance.new("Frame")
-    window.Name = options.Name or "GrokWindow"
-    window.Size = options.Size or UDim2.new(0, 600, 0, 450)
+    window.Name = options.Name or "PremiumWindow"
+    window.Size = options.Size or UDim2.new(0, 650, 0, 500)
     window.Position = UDim2.new(0.5, -window.Size.X.Offset/2, 0.5, -window.Size.Y.Offset/2)
     window.BackgroundColor3 = Theme.Main
     window.BackgroundTransparency = Theme.Transparency
     window.ClipsDescendants = true
-    window.Parent = screen
+    window.Parent = screenGui
     AddCorner(window)
-
+    
     -- Title Bar
     local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 50)
+    titleBar.Size = UDim2.new(1, 0, 0, 55)
     titleBar.BackgroundColor3 = Theme.Secondary
     titleBar.BackgroundTransparency = 0.3
     titleBar.Parent = window
     AddCorner(titleBar, UDim.new(0, 12))
-
-    local title = Instance.new("TextLabel")
-    title.Text = options.Title or "Grok UI"
-    title.Size = UDim2.new(1, -100, 1, 0)
-    title.Position = UDim2.new(0, 20, 0, 0)
-    title.BackgroundTransparency = 1
-    title.TextColor3 = Theme.Text
-    title.Font = Enum.Font.GothamBlack
-    title.TextSize = 24
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = titleBar
-
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Text = options.Title or "Grok Premium"
+    titleLabel.Size = UDim2.new(1, -100, 1, 0)
+    titleLabel.Position = UDim2.new(0, 25, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.TextColor3 = Theme.Text
+    titleLabel.Font = Enum.Font.GothamBlack
+    titleLabel.TextSize = 26
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = titleBar
+    
     -- Close Button
-    local close = Instance.new("TextButton")
-    close.Text = "✕"
-    close.Size = UDim2.new(0, 50, 0, 50)
-    close.Position = UDim2.new(1, -55, 0, 0)
-    close.BackgroundTransparency = 1
-    close.TextColor3 = Theme.Text
-    close.Font = Enum.Font.GothamBold
-    close.TextSize = 30
-    close.Parent = titleBar
-    close.MouseButton1Click:Connect(function()
-        screen:Destroy()
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "✕"
+    closeBtn.Size = UDim2.new(0, 50, 0, 50)
+    closeBtn.Position = UDim2.new(1, -60, 0, 3)
+    closeBtn.BackgroundTransparency = 1
+    closeBtn.TextColor3 = Theme.Text
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 32
+    closeBtn.Parent = titleBar
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
     end)
-
-    -- Tabs Container
+    
+    -- Tab Container
     local tabContainer = Instance.new("Frame")
-    tabContainer.Size = UDim2.new(1, 0, 0, 45)
-    tabContainer.Position = UDim2.new(0, 0, 0, 50)
+    tabContainer.Size = UDim2.new(1, 0, 0, 50)
+    tabContainer.Position = UDim2.new(0, 0, 0, 55)
     tabContainer.BackgroundColor3 = Theme.Accent
     tabContainer.Parent = window
-
+    
     -- Content Area
-    local content = Instance.new("Frame")
-    content.Size = UDim2.new(1, 0, 1, -95)
-    content.Position = UDim2.new(0, 0, 0, 95)
-    content.BackgroundColor3 = Theme.Accent
-    content.BackgroundTransparency = 0.1
-    content.Parent = window
-    AddCorner(content, UDim.new(0, 12))
-
+    local contentArea = Instance.new("Frame")
+    contentArea.Size = UDim2.new(1, 0, 1, -105)
+    contentArea.Position = UDim2.new(0, 0, 0, 105)
+    contentArea.BackgroundColor3 = Theme.Accent
+    contentArea.BackgroundTransparency = 0.15
+    contentArea.Parent = window
+    AddCorner(contentArea, UDim.new(0, 12))
+    
+    -- Tab System
     window.Tabs = {}
     window.CurrentTab = nil
-
-    -- Add Tab Function
-    function window:AddTab(name)
-        local tabBtn = Instance.new("TextButton")
-        tabBtn.Size = UDim2.new(0, 140, 1, 0)
-        tabBtn.Position = UDim2.new(0, (#window.Tabs * 140), 0, 0)
-        tabBtn.BackgroundColor3 = Theme.Accent
-        tabBtn.Text = name
-        tabBtn.TextColor3 = Theme.SubText
-        tabBtn.Font = Enum.Font.GothamBold
-        tabBtn.TextSize = 16
-        tabBtn.Parent = tabContainer
-
+    
+    function window:AddTab(tabName)
+        local tabButton = Instance.new("TextButton")
+        tabButton.Size = UDim2.new(0, 150, 1, 0)
+        tabButton.Position = UDim2.new(0, (#window.Tabs * 150), 0, 0)
+        tabButton.BackgroundColor3 = Theme.Accent
+        tabButton.Text = tabName
+        tabButton.TextColor3 = Theme.SubText
+        tabButton.Font = Enum.Font.GothamBold
+        tabButton.TextSize = 18
+        tabButton.Parent = tabContainer
+        AddCorner(tabButton, UDim.new(0, 0)) -- Flat on bottom
+        
         local tabContent = Instance.new("Frame")
-        tabContent.Size = UDim2.new(1, -20, 1, -20)
-        tabContent.Position = UDim2.new(0, 10, 0, 10)
+        tabContent.Size = UDim2.new(1, -30, 1, -30)
+        tabContent.Position = UDim2.new(0, 15, 0, 15)
         tabContent.BackgroundTransparency = 1
         tabContent.Visible = false
-        tabContent.Parent = content
-
-        table.insert(window.Tabs, {Button = tabBtn, Content = tabContent})
-
-        tabBtn.MouseButton1Click:Connect(function()
+        tabContent.Parent = contentArea
+        
+        table.insert(window.Tabs, {Button = tabButton, Content = tabContent})
+        
+        tabButton.MouseButton1Click:Connect(function()
             if window.CurrentTab then
                 window.CurrentTab.Button.BackgroundColor3 = Theme.Accent
                 window.CurrentTab.Button.TextColor3 = Theme.SubText
                 window.CurrentTab.Content.Visible = false
             end
-            tabBtn.BackgroundColor3 = Theme.Primary
-            tabBtn.TextColor3 = Color3.fromRGB(255,255,255)
+            tabButton.BackgroundColor3 = Theme.Primary
+            tabButton.TextColor3 = Theme.Text
             tabContent.Visible = true
-            window.CurrentTab = {Button = tabBtn, Content = tabContent}
+            window.CurrentTab = {Button = tabButton, Content = tabContent}
         end)
-
+        
+        -- Auto-select first tab
         if #window.Tabs == 1 then
-            tabBtn.MouseButton1Click:Fire()
+            tabButton.MouseButton1Click:Fire()
         end
-
+        
         return tabContent
     end
-
+    
     return window
 end
 
--- Quick Button
+-- Create Button
 function GrokUILib.Button(options)
-    local btn = Instance.new("TextButton")
-    btn.Size = options.Size or UDim2.new(0, 250, 0, 55)
-    btn.Position = options.Position or UDim2.new(0, 0, 0, 0)
-    btn.BackgroundColor3 = Theme.Primary
-    btn.Text = options.Text or "Button"
-    btn.TextColor3 = Theme.Text
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 18
-    btn.Parent = options.Parent
-    AddCorner(btn)
-    AddButtonAnim(btn)
-
+    options = options or {}
+    
+    local button = Instance.new("TextButton")
+    button.Size = options.Size or UDim2.new(0, 280, 0, 60)
+    button.Position = options.Position or UDim2.new(0.5, -140, 0.5, -30)
+    button.BackgroundColor3 = Theme.Primary
+    button.Text = options.Text or "Click Me"
+    button.TextColor3 = Theme.Text
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 20
+    button.Parent = options.Parent
+    AddCorner(button)
+    AddButtonAnim(button)
+    
     if options.Callback then
-        btn.MouseButton1Click:Connect(options.Callback)
+        button.MouseButton1Click:Connect(options.Callback)
     end
-
-    return btn
+    
+    return button
 end
 
--- Quick Label
+-- Create Label
 function GrokUILib.Label(options)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = options.Size or UDim2.new(1, -40, 0, 30)
-    lbl.Position = options.Position or UDim2.new(0, 20, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = options.Text or "Label"
-    lbl.TextColor3 = Theme.Text
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 18
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = options.Parent
-    return lbl
+    options = options or {}
+    
+    local label = Instance.new("TextLabel")
+    label.Size = options.Size or UDim2.new(1, -40, 0, 40)
+    label.Position = options.Position or UDim2.new(0, 20, 0, 20)
+    label.BackgroundTransparency = 1
+    label.Text = options.Text or "Text Label"
+    label.TextColor3 = Theme.Text
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 18
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = options.Parent
+    
+    return label
 end
 
 return GrokUILib
