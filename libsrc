@@ -1,0 +1,209 @@
+-- GrokUILib.lua
+-- A full Roblox UI library with animations, gradient effects, and customizable themes.
+-- Created by Grok on January 05, 2026.
+-- This is a ModuleScript. Require it in your scripts to use.
+
+local GrokUILib = {}
+GrokUILib.__index = GrokUILib
+
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+-- Default Theme
+GrokUILib.DefaultTheme = {
+    PrimaryColor = Color3.fromRGB(0, 122, 255),    -- Main background or button color
+    SecondaryColor = Color3.fromRGB(255, 255, 255), -- Accents or text
+    BackgroundColor = Color3.fromRGB(30, 30, 30),   -- Dark background
+    TextColor = Color3.fromRGB(255, 255, 255),      -- White text
+    HoverColor = Color3.fromRGB(0, 170, 255),       -- Hover effect
+    ClickColor = Color3.fromRGB(0, 80, 200),        -- Click effect
+    BorderColor = Color3.fromRGB(100, 100, 100),    -- Borders
+    Font = Enum.Font.SourceSans,                    -- Default font
+    FontSize = 14,                                  -- Default font size
+    GradientEnabled = true,                         -- Enable gradients by default
+    AnimationSpeed = 0.2,                           -- Tween duration in seconds
+}
+
+-- Create a new UI library instance with optional custom theme
+function GrokUILib.new(customTheme)
+    local self = setmetatable({}, GrokUILib)
+    self.Theme = customTheme or GrokUILib.DefaultTheme
+    self.ScreenGui = Instance.new("ScreenGui")
+    self.ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    self.ScreenGui.Name = "GrokUILibGui"
+    return self
+end
+
+-- Helper function to apply theme to an element
+local function ApplyTheme(element, theme, elementType)
+    if elementType == "Frame" or elementType == "ScrollingFrame" then
+        element.BackgroundColor3 = theme.BackgroundColor
+        element.BorderColor3 = theme.BorderColor
+    elseif elementType == "TextButton" or elementType == "TextLabel" or elementType == "TextBox" then
+        element.BackgroundColor3 = theme.PrimaryColor
+        element.TextColor3 = theme.TextColor
+        element.Font = theme.Font
+        element.TextSize = theme.FontSize
+        element.BorderColor3 = theme.BorderColor
+    elseif elementType == "ImageLabel" or elementType == "ImageButton" then
+        element.BackgroundColor3 = theme.BackgroundColor
+        element.BorderColor3 = theme.BorderColor
+    end
+    
+    -- Apply gradient if enabled
+    if theme.GradientEnabled then
+        local gradient = Instance.new("UIGradient")
+        gradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, theme.PrimaryColor),
+            ColorSequenceKeypoint.new(1, theme.SecondaryColor)
+        })
+        gradient.Parent = element
+    end
+end
+
+-- Helper function to add hover/click animations
+local function AddAnimations(element, theme)
+    local originalColor = element.BackgroundColor3
+    local hoverTween = TweenService:Create(element, TweenInfo.new(theme.AnimationSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = theme.HoverColor})
+    local clickTween = TweenService:Create(element, TweenInfo.new(theme.AnimationSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = theme.ClickColor})
+    local resetTween = TweenService:Create(element, TweenInfo.new(theme.AnimationSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = originalColor})
+    
+    element.MouseEnter:Connect(function()
+        hoverTween:Play()
+    end)
+    
+    element.MouseLeave:Connect(function()
+        resetTween:Play()
+    end)
+    
+    element.MouseButton1Down:Connect(function()
+        clickTween:Play()
+    end)
+    
+    element.MouseButton1Up:Connect(function()
+        resetTween:Play()
+    end)
+end
+
+-- Create a Frame
+function GrokUILib:CreateFrame(options)
+    local frame = Instance.new("Frame")
+    frame.Name = options.Name or "Frame"
+    frame.Size = options.Size or UDim2.new(0, 100, 0, 100)
+    frame.Position = options.Position or UDim2.new(0, 0, 0, 0)
+    frame.Parent = options.Parent or self.ScreenGui
+    
+    ApplyTheme(frame, self.Theme, "Frame")
+    
+    return frame
+end
+
+-- Create a ScrollingFrame
+function GrokUILib:CreateScrollingFrame(options)
+    local scrollingFrame = Instance.new("ScrollingFrame")
+    scrollingFrame.Name = options.Name or "ScrollingFrame"
+    scrollingFrame.Size = options.Size or UDim2.new(0, 100, 0, 100)
+    scrollingFrame.Position = options.Position or UDim2.new(0, 0, 0, 0)
+    scrollingFrame.Parent = options.Parent or self.ScreenGui
+    scrollingFrame.ScrollBarThickness = options.ScrollBarThickness or 5
+    
+    ApplyTheme(scrollingFrame, self.Theme, "ScrollingFrame")
+    
+    return scrollingFrame
+end
+
+-- Create a TextButton
+function GrokUILib:CreateButton(options)
+    local button = Instance.new("TextButton")
+    button.Name = options.Name or "Button"
+    button.Size = options.Size or UDim2.new(0, 100, 0, 50)
+    button.Position = options.Position or UDim2.new(0, 0, 0, 0)
+    button.Text = options.Text or "Button"
+    button.Parent = options.Parent or self.ScreenGui
+    
+    ApplyTheme(button, self.Theme, "TextButton")
+    AddAnimations(button, self.Theme)
+    
+    if options.Callback then
+        button.MouseButton1Click:Connect(options.Callback)
+    end
+    
+    return button
+end
+
+-- Create a TextLabel
+function GrokUILib:CreateLabel(options)
+    local label = Instance.new("TextLabel")
+    label.Name = options.Name or "Label"
+    label.Size = options.Size or UDim2.new(0, 100, 0, 50)
+    label.Position = options.Position or UDim2.new(0, 0, 0, 0)
+    label.Text = options.Text or "Label"
+    label.Parent = options.Parent or self.ScreenGui
+    
+    ApplyTheme(label, self.Theme, "TextLabel")
+    
+    return label
+end
+
+-- Create a TextBox
+function GrokUILib:CreateTextBox(options)
+    local textBox = Instance.new("TextBox")
+    textBox.Name = options.Name or "TextBox"
+    textBox.Size = options.Size or UDim2.new(0, 100, 0, 50)
+    textBox.Position = options.Position or UDim2.new(0, 0, 0, 0)
+    textBox.Text = options.Text or ""
+    textBox.Parent = options.Parent or self.ScreenGui
+    
+    ApplyTheme(textBox, self.Theme, "TextBox")
+    AddAnimations(textBox, self.Theme) -- Optional animations for text boxes
+    
+    return textBox
+end
+
+-- Create an ImageLabel
+function GrokUILib:CreateImageLabel(options)
+    local imageLabel = Instance.new("ImageLabel")
+    imageLabel.Name = options.Name or "ImageLabel"
+    imageLabel.Size = options.Size or UDim2.new(0, 100, 0, 100)
+    imageLabel.Position = options.Position or UDim2.new(0, 0, 0, 0)
+    imageLabel.Image = options.Image or ""
+    imageLabel.Parent = options.Parent or self.ScreenGui
+    
+    ApplyTheme(imageLabel, self.Theme, "ImageLabel")
+    
+    return imageLabel
+end
+
+-- Create an ImageButton
+function GrokUILib:CreateImageButton(options)
+    local imageButton = Instance.new("ImageButton")
+    imageButton.Name = options.Name or "ImageButton"
+    imageButton.Size = options.Size or UDim2.new(0, 100, 0, 100)
+    imageButton.Position = options.Position or UDim2.new(0, 0, 0, 0)
+    imageButton.Image = options.Image or ""
+    imageButton.Parent = options.Parent or self.ScreenGui
+    
+    ApplyTheme(imageButton, self.Theme, "ImageButton")
+    AddAnimations(imageButton, self.Theme)
+    
+    if options.Callback then
+        imageButton.MouseButton1Click:Connect(options.Callback)
+    end
+    
+    return imageButton
+end
+
+-- Set a new theme
+function GrokUILib:SetTheme(newTheme)
+    self.Theme = newTheme
+    -- Note: To apply the new theme to existing elements, you'd need to track them and re-apply. For simplicity, this is omitted here.
+end
+
+-- Destroy the UI
+function GrokUILib:Destroy()
+    if self.ScreenGui then
+        self.ScreenGui:Destroy()
+    end
+end
+
+return GrokUILib
