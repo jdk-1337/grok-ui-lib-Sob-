@@ -1,0 +1,61 @@
+-- ExampleScript.lua (LocalScript)
+
+local GrokUILib = require(game.ReplicatedStorage.GrokUILib) -- Adjust path to your ModuleScript
+
+-- Custom theme example
+local customTheme = {
+    PrimaryColor = Color3.fromRGB(255, 0, 0),      -- Red primary
+    SecondaryColor = Color3.fromRGB(255, 255, 0),  -- Yellow secondary for gradient
+    BackgroundColor = Color3.fromRGB(50, 50, 50),
+    TextColor = Color3.fromRGB(0, 255, 0),         -- Green text
+    HoverColor = Color3.fromRGB(200, 0, 0),
+    ClickColor = Color3.fromRGB(150, 0, 0),
+    BorderColor = Color3.fromRGB(150, 150, 150),
+    Font = Enum.Font.Gotham,
+    FontSize = 18,
+    GradientEnabled = true,
+    AnimationSpeed = 0.3,
+}
+
+local ui = GrokUILib.new(customTheme)
+
+-- Create a main frame (like a window)
+local mainFrame = ui:CreateFrame({
+    Name = "MainWindow",
+    Size = UDim2.new(0, 300, 0, 200),
+    Position = UDim2.new(0.5, -150, 0.5, -100),
+})
+
+-- Create a label inside the frame
+ui:CreateLabel({
+    Parent = mainFrame,
+    Name = "Title",
+    Size = UDim2.new(1, 0, 0, 50),
+    Position = UDim2.new(0, 0, 0, 0),
+    Text = "Welcome to Grok UI!",
+})
+
+-- Create a button inside the frame
+ui:CreateButton({
+    Parent = mainFrame,
+    Name = "ClickMe",
+    Size = UDim2.new(0.5, 0, 0, 50),
+    Position = UDim2.new(0.25, 0, 0.5, 0),
+    Text = "Click Me",
+    Callback = function()
+        print("Button clicked!")
+    end,
+})
+
+-- Create a text box
+ui:CreateTextBox({
+    Parent = mainFrame,
+    Name = "Input",
+    Size = UDim2.new(0.8, 0, 0, 30),
+    Position = UDim2.new(0.1, 0, 0.8, 0),
+    Text = "Type here...",
+})
+
+-- Optionally change theme later
+wait(5)
+ui:SetTheme(GrokUILib.DefaultTheme) -- Switches to default theme, but note: existing elements won't auto-update in this simple implementation.
