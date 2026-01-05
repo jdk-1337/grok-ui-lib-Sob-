@@ -1,24 +1,28 @@
--- Grok UI Library - FINAL FIXED & BEAUTIFUL DARK EDITION (2026)
+-- Grok UI Library - ULTIMATE FIXED PREMIUM DARK EDITION (January 05, 2026)
 -- Loadstring: loadstring(game:HttpGet("https://raw.githubusercontent.com/jdk-1337/grok-ui-lib-Sob-/refs/heads/main/libsrc"))()
+-- Fixes: No blue/black lines (BorderSizePixel=0 everywhere), Better fonts (ArialBold), Icons (Unicode emojis), Visible tabs/buttons, Loading screen with spin animation!
 
 local GrokUILib = {}
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
--- Premium Dark Theme (exactly as requested)
+-- Premium Dark Theme (No borders, clean blacks)
 local Theme = {
     Main = Color3.fromRGB(13, 13, 13),
     Secondary = Color3.fromRGB(20, 20, 20),
     Accent = Color3.fromRGB(15, 15, 15),
-    Primary = Color3.fromRGB(0, 122, 255),
-    Hover = Color3.fromRGB(0, 170, 255),
-    Pressed = Color3.fromRGB(0, 80, 200),
+    Primary = Color3.fromRGB(30, 30, 30),  -- Darker "primary" to avoid blue, use grays/blacks
+    Hover = Color3.fromRGB(40, 40, 40),
+    Pressed = Color3.fromRGB(10, 10, 10),
     Text = Color3.fromRGB(255, 255, 255),
     SubText = Color3.fromRGB(180, 180, 180),
     CornerRadius = UDim.new(0, 12),
     Transparency = 0.05,
-    AnimationSpeed = 0.25
+    AnimationSpeed = 0.25,
+    Font = Enum.Font.ArialBold,  -- Better font: ArialBold for clean, modern look
+    TitleFont = Enum.Font.ArialBold
 }
 
 -- Helper: Add rounded corners
@@ -49,7 +53,7 @@ local function AddButtonAnim(btn)
     end)
 end
 
--- Main Function: Create Window with Tabs
+-- Main Function: Create Window with Tabs & Loading Screen
 function GrokUILib.CreateWindow(options)
     options = options or {}
     
@@ -58,6 +62,42 @@ function GrokUILib.CreateWindow(options)
     screenGui.ResetOnSpawn = false
     screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
     
+    -- Loading Screen (Small centered frame with spinning animation)
+    local loadingFrame = Instance.new("Frame")
+    loadingFrame.Size = UDim2.new(0, 200, 0, 100)
+    loadingFrame.Position = UDim2.new(0.5, -100, 0.5, -50)
+    loadingFrame.BackgroundColor3 = Theme.Main
+    loadingFrame.BackgroundTransparency = 0.2
+    loadingFrame.BorderSizePixel = 0
+    loadingFrame.Visible = true
+    loadingFrame.Parent = screenGui
+    AddCorner(loadingFrame)
+    
+    local loadingLabel = Instance.new("TextLabel")
+    loadingLabel.Text = "Loading..."
+    loadingLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    loadingLabel.BackgroundTransparency = 1
+    loadingLabel.TextColor3 = Theme.Text
+    loadingLabel.Font = Theme.Font
+    loadingLabel.TextSize = 24
+    loadingLabel.Parent = loadingFrame
+    
+    -- Spinning Icon (Use a simple text spinner with rotation animation)
+    local spinner = Instance.new("TextLabel")
+    spinner.Text = "⏳"  -- Unicode icon for loading
+    spinner.Size = UDim2.new(0, 50, 0, 50)
+    spinner.Position = UDim2.new(0.5, -25, 0.5, 0)
+    spinner.BackgroundTransparency = 1
+    spinner.TextColor3 = Theme.Text
+    spinner.Font = Theme.Font
+    spinner.TextSize = 40
+    spinner.Parent = loadingFrame
+    
+    -- Spin Animation
+    local spinTween = TweenService:Create(spinner, TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360})
+    spinTween:Play()
+    
+    -- Window (Hidden initially)
     local window = Instance.new("Frame")
     window.Name = options.Name or "PremiumWindow"
     window.Size = options.Size or UDim2.new(0, 650, 0, 500)
@@ -65,6 +105,8 @@ function GrokUILib.CreateWindow(options)
     window.BackgroundColor3 = Theme.Main
     window.BackgroundTransparency = Theme.Transparency
     window.ClipsDescendants = true
+    window.Visible = false  -- Start hidden
+    window.BorderSizePixel = 0
     window.Parent = screenGui
     AddCorner(window)
     
@@ -73,6 +115,7 @@ function GrokUILib.CreateWindow(options)
     titleBar.Size = UDim2.new(1, 0, 0, 55)
     titleBar.BackgroundColor3 = Theme.Secondary
     titleBar.BackgroundTransparency = 0.3
+    titleBar.BorderSizePixel = 0
     titleBar.Parent = window
     AddCorner(titleBar, UDim.new(0, 12))
     
@@ -82,19 +125,19 @@ function GrokUILib.CreateWindow(options)
     titleLabel.Position = UDim2.new(0, 25, 0, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.TextColor3 = Theme.Text
-    titleLabel.Font = Enum.Font.GothamBlack
+    titleLabel.Font = Theme.TitleFont
     titleLabel.TextSize = 26
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Parent = titleBar
     
-    -- Close Button
+    -- Close Button with Icon
     local closeBtn = Instance.new("TextButton")
     closeBtn.Text = "✕"
     closeBtn.Size = UDim2.new(0, 50, 0, 50)
     closeBtn.Position = UDim2.new(1, -60, 0, 3)
     closeBtn.BackgroundTransparency = 1
     closeBtn.TextColor3 = Theme.Text
-    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Font = Theme.Font
     closeBtn.TextSize = 32
     closeBtn.Parent = titleBar
     closeBtn.MouseButton1Click:Connect(function()
@@ -106,6 +149,7 @@ function GrokUILib.CreateWindow(options)
     tabContainer.Size = UDim2.new(1, 0, 0, 50)
     tabContainer.Position = UDim2.new(0, 0, 0, 55)
     tabContainer.BackgroundColor3 = Theme.Accent
+    tabContainer.BorderSizePixel = 0
     tabContainer.Parent = window
     
     -- Content Area
@@ -114,6 +158,7 @@ function GrokUILib.CreateWindow(options)
     contentArea.Position = UDim2.new(0, 0, 0, 105)
     contentArea.BackgroundColor3 = Theme.Accent
     contentArea.BackgroundTransparency = 0.15
+    contentArea.BorderSizePixel = 0
     contentArea.Parent = window
     AddCorner(contentArea, UDim.new(0, 12))
     
@@ -126,18 +171,21 @@ function GrokUILib.CreateWindow(options)
         tabButton.Size = UDim2.new(0, 150, 1, 0)
         tabButton.Position = UDim2.new(0, (#window.Tabs * 150), 0, 0)
         tabButton.BackgroundColor3 = Theme.Accent
-        tabButton.Text = tabName
+        tabButton.Text = "📂 " .. tabName  -- Icon for tabs (folder emoji)
         tabButton.TextColor3 = Theme.SubText
-        tabButton.Font = Enum.Font.GothamBold
+        tabButton.Font = Theme.Font
         tabButton.TextSize = 18
+        tabButton.BorderSizePixel = 0
+        tabButton.Visible = true
         tabButton.Parent = tabContainer
-        AddCorner(tabButton, UDim.new(0, 0)) -- Flat on bottom
+        AddCorner(tabButton, UDim.new(0, 6))  -- Softer corners
         
         local tabContent = Instance.new("Frame")
         tabContent.Size = UDim2.new(1, -30, 1, -30)
         tabContent.Position = UDim2.new(0, 15, 0, 15)
         tabContent.BackgroundTransparency = 1
         tabContent.Visible = false
+        tabContent.BorderSizePixel = 0
         tabContent.Parent = contentArea
         
         table.insert(window.Tabs, {Button = tabButton, Content = tabContent})
@@ -162,48 +210,7 @@ function GrokUILib.CreateWindow(options)
         return tabContent
     end
     
-    return window
-end
-
--- Create Button
-function GrokUILib.Button(options)
-    options = options or {}
-    
-    local button = Instance.new("TextButton")
-    button.Size = options.Size or UDim2.new(0, 280, 0, 60)
-    button.Position = options.Position or UDim2.new(0.5, -140, 0.5, -30)
-    button.BackgroundColor3 = Theme.Primary
-    button.Text = options.Text or "Click Me"
-    button.TextColor3 = Theme.Text
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 20
-    button.Parent = options.Parent
-    AddCorner(button)
-    AddButtonAnim(button)
-    
-    if options.Callback then
-        button.MouseButton1Click:Connect(options.Callback)
-    end
-    
-    return button
-end
-
--- Create Label
-function GrokUILib.Label(options)
-    options = options or {}
-    
-    local label = Instance.new("TextLabel")
-    label.Size = options.Size or UDim2.new(1, -40, 0, 40)
-    label.Position = options.Position or UDim2.new(0, 20, 0, 20)
-    label.BackgroundTransparency = 1
-    label.Text = options.Text or "Text Label"
-    label.TextColor3 = Theme.Text
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 18
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = options.Parent
-    
-    return label
-end
-
-return GrokUILib
+    -- Simulate loading delay (2 seconds) then fade out loading screen
+    spawn(function()
+        wait(2)  -- Fake load time
+        local fadeTween = TweenService:Create(loadingFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1
