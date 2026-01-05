@@ -84,11 +84,104 @@ local function MakeDraggable(frame, dragHandle)
     end)
 end
 
+-- Create Loader
+local function CreateLoader()
+    local LoaderGui = Instance.new("ScreenGui")
+    LoaderGui.Name = "LoaderGui"
+    LoaderGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    LoaderGui.Parent = game:GetService("CoreGui")
+    
+    local LoaderFrame = Instance.new("Frame")
+    LoaderFrame.Name = "LoaderFrame"
+    LoaderFrame.Size = UDim2.new(0, 300, 0, 150)
+    LoaderFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    LoaderFrame.BackgroundColor3 = Library.Theme.Background
+    LoaderFrame.BorderSizePixel = 0
+    LoaderFrame.Parent = LoaderGui
+    AddCorner(LoaderFrame, UDim.new(0, 12))
+    
+    local AccentBar = Instance.new("Frame")
+    AccentBar.Name = "AccentBar"
+    AccentBar.Size = UDim2.new(1, 0, 0, 3)
+    AccentBar.BackgroundColor3 = Library.Theme.Accent
+    AccentBar.BorderSizePixel = 0
+    AccentBar.Parent = LoaderFrame
+    AddGradient(AccentBar)
+    
+    local LoaderTitle = Instance.new("TextLabel")
+    LoaderTitle.Size = UDim2.new(1, 0, 0, 40)
+    LoaderTitle.Position = UDim2.new(0, 0, 0, 20)
+    LoaderTitle.BackgroundTransparency = 1
+    LoaderTitle.Text = "Loading UI Library"
+    LoaderTitle.TextColor3 = Library.Theme.Text
+    LoaderTitle.TextSize = 16
+    LoaderTitle.Font = Enum.Font.GothamBold
+    LoaderTitle.Parent = LoaderFrame
+    
+    local LoaderStatus = Instance.new("TextLabel")
+    LoaderStatus.Size = UDim2.new(1, 0, 0, 20)
+    LoaderStatus.Position = UDim2.new(0, 0, 0, 60)
+    LoaderStatus.BackgroundTransparency = 1
+    LoaderStatus.Text = "Initializing..."
+    LoaderStatus.TextColor3 = Library.Theme.TextDark
+    LoaderStatus.TextSize = 13
+    LoaderStatus.Font = Enum.Font.Gotham
+    LoaderStatus.Parent = LoaderFrame
+    
+    local ProgressBack = Instance.new("Frame")
+    ProgressBack.Size = UDim2.new(0.8, 0, 0, 6)
+    ProgressBack.Position = UDim2.new(0.1, 0, 0, 100)
+    ProgressBack.BackgroundColor3 = Library.Theme.Tertiary
+    ProgressBack.BorderSizePixel = 0
+    ProgressBack.Parent = LoaderFrame
+    AddCorner(ProgressBack, UDim.new(1, 0))
+    
+    local ProgressFill = Instance.new("Frame")
+    ProgressFill.Size = UDim2.new(0, 0, 1, 0)
+    ProgressFill.BackgroundColor3 = Library.Theme.Accent
+    ProgressFill.BorderSizePixel = 0
+    ProgressFill.Parent = ProgressBack
+    AddCorner(ProgressFill, UDim.new(1, 0))
+    AddGradient(ProgressFill)
+    
+    -- Entrance animation
+    LoaderFrame.Size = UDim2.new(0, 0, 0, 0)
+    Tween(LoaderFrame, {Size = UDim2.new(0, 300, 0, 150)}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    
+    -- Simulate loading
+    local stages = {
+        {text = "Initializing...", progress = 0.2},
+        {text = "Loading components...", progress = 0.5},
+        {text = "Setting up UI...", progress = 0.8},
+        {text = "Finalizing...", progress = 1}
+    }
+    
+    spawn(function()
+        for _, stage in ipairs(stages) do
+            LoaderStatus.Text = stage.text
+            Tween(ProgressFill, {Size = UDim2.new(stage.progress, 0, 1, 0)}, 0.3)
+            wait(0.4)
+        end
+        
+        LoaderStatus.Text = "Complete!"
+        LoaderStatus.TextColor3 = Library.Theme.Success
+        wait(0.3)
+        
+        Tween(LoaderFrame, {Size = UDim2.new(0, 0, 0, 0)}, 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        wait(0.3)
+        LoaderGui:Destroy()
+    end)
+end
+
 -- Create Window
 function Library:CreateWindow(config)
     config = config or {}
     config.Title = config.Title or "UI Library"
     config.Size = config.Size or UDim2.new(0, 600, 0, 400)
+    
+    -- Show loader
+    CreateLoader()
+    wait(2) -- Wait for loader to finish
     
     -- ScreenGui
     local ScreenGui = Instance.new("ScreenGui")
@@ -103,22 +196,8 @@ function Library:CreateWindow(config)
     MainFrame.Position = UDim2.new(0.5, -config.Size.X.Offset/2, 0.5, -config.Size.Y.Offset/2)
     MainFrame.BackgroundColor3 = Library.Theme.Background
     MainFrame.BorderSizePixel = 0
-    MainFrame.BackgroundTransparency = 0.1
     MainFrame.Parent = ScreenGui
     AddCorner(MainFrame, UDim.new(0, 12))
-    
-    -- Shadow Effect
-    local Shadow = Instance.new("ImageLabel")
-    Shadow.Name = "Shadow"
-    Shadow.Size = UDim2.new(1, 30, 1, 30)
-    Shadow.Position = UDim2.new(0, -15, 0, -15)
-    Shadow.BackgroundTransparency = 1
-    Shadow.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
-    Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    Shadow.ImageTransparency = 0.7
-    Shadow.ScaleType = Enum.ScaleType.Slice
-    Shadow.SliceCenter = Rect.new(10, 10, 118, 118)
-    Shadow.Parent = MainFrame
     
     -- Top Bar
     local TopBar = Instance.new("Frame")
@@ -550,80 +629,4 @@ function Library:CreateWindow(config)
             TextboxLabel.TextColor3 = Library.Theme.Text
             TextboxLabel.TextSize = 14
             TextboxLabel.Font = Enum.Font.Gotham
-            TextboxLabel.TextXAlignment = Enum.TextXAlignment.Left
-            TextboxLabel.Parent = TextboxFrame
-            
-            local Textbox = Instance.new("TextBox")
-            Textbox.Size = UDim2.new(1, -30, 0, 30)
-            Textbox.Position = UDim2.new(0, 15, 1, -38)
-            Textbox.BackgroundColor3 = Library.Theme.Tertiary
-            Textbox.BorderSizePixel = 0
-            Textbox.Text = ""
-            Textbox.PlaceholderText = config.Placeholder
-            Textbox.TextColor3 = Library.Theme.Text
-            Textbox.PlaceholderColor3 = Library.Theme.TextDark
-            Textbox.TextSize = 13
-            Textbox.Font = Enum.Font.Gotham
-            Textbox.ClearTextOnFocus = false
-            Textbox.Parent = TextboxFrame
-            AddCorner(Textbox, UDim.new(0, 6))
-            
-            local TextboxPadding = Instance.new("UIPadding")
-            TextboxPadding.PaddingLeft = UDim.new(0, 10)
-            TextboxPadding.PaddingRight = UDim.new(0, 10)
-            TextboxPadding.Parent = Textbox
-            
-            Textbox.FocusLost:Connect(function(enterPressed)
-                if enterPressed then
-                    config.Callback(Textbox.Text)
-                end
-            end)
-            
-            Textbox.Focused:Connect(function()
-                Tween(Textbox, {BackgroundColor3 = Library.Theme.Secondary}, 0.2)
-            end)
-            
-            Textbox.FocusLost:Connect(function()
-                Tween(Textbox, {BackgroundColor3 = Library.Theme.Tertiary}, 0.2)
-            end)
-            
-            return {
-                Frame = TextboxFrame,
-                SetValue = function(val)
-                    Textbox.Text = val
-                end
-            }
-        end
-        
-        function Tab:AddLabel(text)
-            local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(1, 0, 0, 30)
-            Label.BackgroundColor3 = Library.Theme.Secondary
-            Label.BorderSizePixel = 0
-            Label.Text = text
-            Label.TextColor3 = Library.Theme.Text
-            Label.TextSize = 14
-            Label.Font = Enum.Font.Gotham
-            Label.TextXAlignment = Enum.TextXAlignment.Left
-            Label.Parent = TabContent
-            AddCorner(Label)
-            
-            local LabelPadding = Instance.new("UIPadding")
-            LabelPadding.PaddingLeft = UDim.new(0, 15)
-            LabelPadding.Parent = Label
-            
-            return {
-                Frame = Label,
-                SetText = function(txt)
-                    Label.Text = txt
-                end
-            }
-        end
-        
-        return Tab
-    end
-    
-    return Window
-end
-
-return Library
+            Textbox
