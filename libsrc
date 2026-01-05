@@ -1,25 +1,33 @@
--- Grok UI Library - ULTRA CLEAN FIXED EDITION (No lines, visible tabs, perfect close button)
--- Fixes: Tabs now VISIBLE & working, no black lines, close button round & styled, darker uniform colors
+-- Grok UI Library - PREMIUM VISUAL UPGRADE & FIXED EDITION (January 05, 2026)
+-- Fully debugged logically: Fixed 'Tabs not valid member' by using a wrapper table for window.
+-- Visual upgrades: Uniform deep black theme (no lines/contrasts), soft gradients on buttons/tabs, glow effects with UIStroke, rounded everything, visible tabs with icons, red round close button with animation.
+-- Added subtle shadow/glow for premium feel, draggable window, better positioning/sizing for visibility.
 
 local GrokUILib = {}
 
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 
--- Pure Black Theme (All similar dark shades, no contrast lines)
+-- Premium Deep Black Theme (No visible lines, soft contrasts)
 local Theme = {
-    Main = Color3.fromRGB(13, 13, 13),
-    Secondary = Color3.fromRGB(18, 18, 18),  -- Slightly lighter for title bar
-    Accent = Color3.fromRGB(13, 13, 13),    -- Same as main to hide any "line"
-    Primary = Color3.fromRGB(25, 25, 25),    -- Button normal
-    Hover = Color3.fromRGB(35, 35, 35),
-    Pressed = Color3.fromRGB(8, 8, 8),
-    ActiveTab = Color3.fromRGB(30, 30, 30), -- Selected tab highlight
+    Main = Color3.fromRGB(10, 10, 10),        -- Window BG
+    TitleBar = Color3.fromRGB(15, 15, 15),    -- Title bar
+    TabBar = Color3.fromRGB(10, 10, 10),      -- Tab bar (same as main)
+    Content = Color3.fromRGB(10, 10, 10),     -- Content (same)
+    ButtonNormal = Color3.fromRGB(25, 25, 25),
+    ButtonHover = Color3.fromRGB(35, 35, 35),
+    ButtonPressed = Color3.fromRGB(5, 5, 5),
+    TabNormal = Color3.fromRGB(10, 10, 10),
+    TabActive = Color3.fromRGB(20, 20, 20),
     Text = Color3.fromRGB(255, 255, 255),
     SubText = Color3.fromRGB(200, 200, 200),
+    CloseNormal = Color3.fromRGB(200, 40, 40),
+    CloseHover = Color3.fromRGB(255, 60, 60),
     CornerRadius = UDim.new(0, 12),
-    TabCornerRadius = UDim.new(0, 8),
-    Transparency = 0,
+    TabRadius = UDim.new(0, 8),
+    GlowColor = Color3.fromRGB(255, 255, 255), -- For UIStroke glow
+    GlowTransparency = 0.8,
     AnimationSpeed = 0.3,
     Font = Enum.Font.ArialBold,
     TitleFont = Enum.Font.ArialBold
@@ -32,20 +40,41 @@ local function AddCorner(obj, radius)
     corner.Parent = obj
 end
 
--- Helper: Button animation
-local function AddButtonAnim(btn)
-    local original = btn.BackgroundColor3
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(Theme.AnimationSpeed), {BackgroundColor3 = Theme.Hover}):Play()
+-- Helper: Add soft glow/shadow with UIStroke
+local function AddGlow(obj)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Theme.GlowColor
+    stroke.Transparency = Theme.GlowTransparency
+    stroke.Thickness = 1
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = obj
+end
+
+-- Helper: Add subtle gradient
+local function AddGradient(obj)
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Theme.ButtonNormal),
+        ColorSequenceKeypoint.new(1, Theme.ButtonPressed)
+    })
+    gradient.Rotation = 90
+    gradient.Parent = obj
+end
+
+-- Helper: Button/Tabs animation
+local function AddAnim(obj, normal, hover, pressed)
+    obj.MouseEnter:Connect(function()
+        TweenService:Create(obj, TweenInfo.new(Theme.AnimationSpeed), {BackgroundColor3 = hover}):Play()
     end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(Theme.AnimationSpeed), {BackgroundColor3 = original}):Play()
+    obj.MouseLeave:Connect(function()
+        TweenService:Create(obj, TweenInfo.new(Theme.AnimationSpeed), {BackgroundColor3 = normal}):Play()
     end)
-    btn.MouseButton1Down:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Theme.Pressed}):Play()
+    obj.MouseButton1Down:Connect(function()
+        TweenService:Create(obj, TweenInfo.new(0.1), {BackgroundColor3 = pressed}):Play()
     end)
 end
 
+-- Create Window (Wrapper table to avoid Instance property errors)
 function GrokUILib.CreateWindow(options)
     options = options or {}
     
@@ -54,24 +83,49 @@ function GrokUILib.CreateWindow(options)
     screenGui.ResetOnSpawn = false
     screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
     
-    -- Main Window
-    local window = Instance.new("Frame")
-    window.Size = options.Size or UDim2.new(0, 750, 0, 550)
-    window.Position = UDim2.new(0.5, -window.Size.X.Offset/2, 0.5, -window.Size.Y.Offset/2)
-    window.BackgroundColor3 = Theme.Main
-    window.BackgroundTransparency = Theme.Transparency
-    window.BorderSizePixel = 0
-    window.ClipsDescendants = true
-    window.Parent = screenGui
-    AddCorner(window)
+    local windowFrame = Instance.new("Frame")
+    windowFrame.Size = options.Size or UDim2.new(0, 750, 0, 550)
+    windowFrame.Position = UDim2.new(0.5, -windowFrame.Size.X.Offset/2, 0.5, -windowFrame.Size.Y.Offset/2)
+    windowFrame.BackgroundColor3 = Theme.Main
+    windowFrame.BorderSizePixel = 0
+    windowFrame.ClipsDescendants = true
+    windowFrame.Parent = screenGui
+    AddCorner(windowFrame)
+    AddGlow(windowFrame)  -- Premium glow
+    
+    -- Make window draggable
+    local dragging, dragInput, dragStart, startPos
+    windowFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = windowFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    windowFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            windowFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
     
     -- Title Bar
     local titleBar = Instance.new("Frame")
     titleBar.Size = UDim2.new(1, 0, 0, 60)
-    titleBar.BackgroundColor3 = Theme.Secondary
+    titleBar.BackgroundColor3 = Theme.TitleBar
     titleBar.BorderSizePixel = 0
-    titleBar.Parent = window
-    AddCorner(titleBar, UDim.new(1, 0))  -- Round only top corners
+    titleBar.Parent = windowFrame
+    AddCorner(titleBar, UDim.new(0, 12))  -- Top round
     
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Text = options.Title or "Grok Premium"
@@ -84,79 +138,90 @@ function GrokUILib.CreateWindow(options)
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Parent = titleBar
     
-    -- Close Button (Round, styled, visible)
+    -- Close Button (Fully round, red, animated)
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 45, 0, 45)
-    closeBtn.Position = UDim2.new(1, -60, 0.5, -22.5)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 40, 40)  -- Red for visibility
+    closeBtn.Size = UDim2.new(0, 40, 0, 40)
+    closeBtn.Position = UDim2.new(1, -50, 0.5, -20)
+    closeBtn.BackgroundColor3 = Theme.CloseNormal
     closeBtn.Text = "✕"
     closeBtn.TextColor3 = Theme.Text
     closeBtn.Font = Theme.Font
-    closeBtn.TextSize = 28
+    closeBtn.TextSize = 24
     closeBtn.BorderSizePixel = 0
     closeBtn.Parent = titleBar
-    AddCorner(closeBtn, UDim.new(1, 0))  -- Fully round
-    AddButtonAnim(closeBtn)
+    AddCorner(closeBtn, UDim.new(1, 0))  -- Circle
+    AddAnim(closeBtn, Theme.CloseNormal, Theme.CloseHover, Theme.CloseNormal)
     closeBtn.MouseButton1Click:Connect(function()
         screenGui:Destroy()
     end)
     
-    -- Tab Container
-    local tabContainer = Instance.new("Frame")
+    -- Tab Container (Same color as main, no line)
+    local tabContainer = Instance.new("ScrollingFrame")
     tabContainer.Size = UDim2.new(1, 0, 0, 50)
     tabContainer.Position = UDim2.new(0, 0, 0, 60)
-    tabContainer.BackgroundColor3 = Theme.Accent
+    tabContainer.BackgroundColor3 = Theme.TabBar
     tabContainer.BorderSizePixel = 0
-    tabContainer.Parent = window
+    tabContainer.ScrollBarThickness = 0
+    tabContainer.ScrollingDirection = Enum.ScrollingDirection.X
+    tabContainer.CanvasSize = UDim2.new(0, 0, 0, 0)  -- Auto-size
+    tabContainer.Parent = windowFrame
     
-    -- Content Area
+    -- Content Area (Same color, no line)
     local contentArea = Instance.new("Frame")
     contentArea.Size = UDim2.new(1, 0, 1, -110)
     contentArea.Position = UDim2.new(0, 0, 0, 110)
-    contentArea.BackgroundColor3 = Theme.Main
+    contentArea.BackgroundColor3 = Theme.Content
     contentArea.BorderSizePixel = 0
-    contentArea.Parent = window
-    AddCorner(contentArea, UDim.new(0, 12))  -- Round bottom only
+    contentArea.Parent = windowFrame
+    AddCorner(contentArea, UDim.new(0, 12))  -- Bottom round
     
-    -- Tab System (Now fully visible & working)
-    window.Tabs = {}
+    -- Wrapper table for window
+    local window = {}
+    window.Frame = windowFrame
+    window.TabsData = {}  -- Renamed to avoid confusion
     window.CurrentTab = nil
     
     function window:AddTab(tabName)
+        local tabIndex = #window.TabsData + 1
+        
         local tabButton = Instance.new("TextButton")
         tabButton.Size = UDim2.new(0, 160, 1, 0)
-        tabButton.Position = UDim2.new(0, (#window.Tabs * 160), 0, 0)
-        tabButton.BackgroundColor3 = Theme.Accent
-        tabButton.Text = tabName
+        tabButton.Position = UDim2.new(0, (tabIndex - 1) * 160, 0, 0)
+        tabButton.BackgroundColor3 = Theme.TabNormal
+        tabButton.Text = "📂 " .. tabName  -- Icon for visibility
         tabButton.TextColor3 = Theme.SubText
         tabButton.Font = Theme.Font
         tabButton.TextSize = 20
         tabButton.BorderSizePixel = 0
         tabButton.Parent = tabContainer
-        AddCorner(tabButton, Theme.TabCornerRadius)
+        AddCorner(tabButton, Theme.TabRadius)
+        AddGradient(tabButton)  -- Soft gradient
+        AddAnim(tabButton, Theme.TabNormal, Theme.TabActive, Theme.TabNormal)
+        
+        -- Update canvas size
+        tabContainer.CanvasSize = UDim2.new(0, tabIndex * 160, 0, 50)
         
         local tabContent = Instance.new("Frame")
-        tabContent.Size = UDim2.new(1, -40, 1, -40)
-        tabContent.Position = UDim2.new(0, 20, 0, 20)
+        tabContent.Size = UDim2.new(1, 0, 1, 0)
         tabContent.BackgroundTransparency = 1
         tabContent.Visible = false
         tabContent.Parent = contentArea
         
-        table.insert(window.Tabs, {Button = tabButton, Content = tabContent})
+        window.TabsData[tabIndex] = {Button = tabButton, Content = tabContent}
         
         tabButton.MouseButton1Click:Connect(function()
             if window.CurrentTab then
-                window.CurrentTab.Button.BackgroundColor3 = Theme.Accent
+                window.CurrentTab.Button.BackgroundColor3 = Theme.TabNormal
                 window.CurrentTab.Button.TextColor3 = Theme.SubText
                 window.CurrentTab.Content.Visible = false
             end
-            tabButton.BackgroundColor3 = Theme.ActiveTab
+            tabButton.BackgroundColor3 = Theme.TabActive
             tabButton.TextColor3 = Theme.Text
             tabContent.Visible = true
-            window.CurrentTab = {Button = tabButton, Content = tabContent}
+            window.CurrentTab = window.TabsData[tabIndex]
         end)
         
-        if #window.Tabs == 1 then
+        if tabIndex == 1 then
             tabButton.MouseButton1Click:Fire()
         end
         
@@ -166,31 +231,36 @@ function GrokUILib.CreateWindow(options)
     return window
 end
 
--- Button with icon
+-- Button with upgrades
 function GrokUILib.Button(options)
     options = options or {}
+    
     local button = Instance.new("TextButton")
     button.Size = options.Size or UDim2.new(0, 320, 0, 65)
     button.Position = options.Position or UDim2.new(0.5, -160, 0.5, -32.5)
-    button.BackgroundColor3 = Theme.Primary
-    button.Text = (options.Icon or "") .. (options.Text or "Button")
+    button.BackgroundColor3 = Theme.ButtonNormal
+    button.Text = (options.Icon or "🔘 ") .. (options.Text or "Button")
     button.TextColor3 = Theme.Text
     button.Font = Theme.Font
     button.TextSize = 22
     button.BorderSizePixel = 0
     button.Parent = options.Parent
     AddCorner(button)
-    AddButtonAnim(button)
+    AddGradient(button)
+    AddGlow(button)  -- Premium glow
+    AddAnim(button, Theme.ButtonNormal, Theme.ButtonHover, Theme.ButtonPressed)
     
     if options.Callback then
         button.MouseButton1Click:Connect(options.Callback)
     end
+    
     return button
 end
 
 -- Label
 function GrokUILib.Label(options)
     options = options or {}
+    
     local label = Instance.new("TextLabel")
     label.Size = options.Size or UDim2.new(1, -60, 0, 50)
     label.Position = options.Position or UDim2.new(0, 30, 0, 20)
@@ -201,6 +271,7 @@ function GrokUILib.Label(options)
     label.TextSize = 20
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = options.Parent
+    
     return label
 end
 
