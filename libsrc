@@ -16,8 +16,11 @@ local TweenService = game:GetService("TweenService") -- For anims go brr
 local UserInputService = game:GetService("UserInputService") -- Input rizz
 local RunService = game:GetService("RunService") -- Frame loop sigma
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer or Players:WaitForChild("LocalPlayer")  -- Sigma fix: Wait for LocalPlayer to avoid nil
 local Mouse = LocalPlayer:GetMouse()
+
+-- Global dt tracker for Timer (sigma fix outside functions)
+local lastTime = os.clock()
 
 -- Global State (expanded with more vars for new features)
 ImGrokUI.State = {
@@ -57,9 +60,9 @@ ImGrokUI.State = {
         ShadowThickness = 2,
     },
     Fonts = {
-        Default = Font.new("Arial", 14, Enum.FontWeight.Regular),
-        Bold = Font.new("Arial", 14, Enum.FontWeight.Bold),
-        Italic = Font.new("Arial", 14, Enum.FontStyle.Italic), -- New
+        Default = Font.new("Arial", Enum.FontWeight.Regular, Enum.FontStyle.Normal),  -- Sigma fix: Removed invalid 14 param
+        Bold = Font.new("Arial", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
+        Italic = Font.new("Arial", Enum.FontWeight.Regular, Enum.FontStyle.Italic), -- New
     },
     ScreenGui = nil,
     CurrentColumn = 0, -- For multi-column
@@ -67,6 +70,8 @@ ImGrokUI.State = {
     Localization = {}, -- Stub for i18n
     ErrorHandler = function(err) warn("ImGrokUI Error: " .. err) end, -- Basic error
     Perf = {CullOffscreen = true}, -- New: Perf opt
+    CurrentTabBar = nil,
+    CurrentMenuBar = nil,
 }
 
 -- Init (expanded with shadow setup)
@@ -77,27 +82,25 @@ function ImGrokUI.Init()
     ImGrokUI.State.ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     ImGrokUI.State.ScreenGui.IgnoreGuiInset = true
     ImGrokUI.State.ScreenGui.ResetOnSpawn = false
-    -- Bind frame loop
-    RunService.RenderStepped:Connect(function(dt)
-        ImGrokUI.NewFrame()
-        -- User UI code here (external)
-        ImGrokUI.EndFrame()
-    end)
 end
 
--- NewFrame (expanded with tooltip timer, perf cull)
+-- NewFrame (expanded with tooltip timer, perf cull – sigma fix for Timer without :Wait())
 function ImGrokUI.NewFrame()
     ImGrokUI.State.HotItem = nil
     ImGrokUI.State.ActiveItem = nil
     ImGrokUI.State.HoveredItem = nil
-    ImGrokUI.State.Tooltip.Timer = ImGrokUI.State.Tooltip.Timer + RunService.RenderStepped:Wait() -- Delta time for delay
+    local currentTime = os.clock()
+    local dt = currentTime - lastTime
+    lastTime = currentTime
+    ImGrokUI.State.Tooltip.Timer = ImGrokUI.State.Tooltip.Timer + dt  -- Sigma fix: Proper dt without yield
     if ImGrokUI.State.Tooltip.Frame and ImGrokUI.State.Tooltip.Timer > ImGrokUI.State.Tooltip.Delay then
         ImGrokUI.State.Tooltip.Frame.Visible = true
     end
     -- Perf: Cull offscreen windows
     if ImGrokUI.State.Perf.CullOffscreen then
         for _, win in pairs(ImGrokUI.State.Windows) do
-            if win.Frame.AbsolutePosition.X > workspace.CurrentCamera.ViewportSize.X or win.Frame.AbsolutePosition.Y > workspace.CurrentCamera.ViewportSize.Y then
+            local vp = workspace.CurrentCamera.ViewportSize
+            if win.Frame.AbsolutePosition.X > vp.X or win.Frame.AbsolutePosition.Y > vp.Y then
                 win.Frame.Visible = false
             else
                 win.Frame.Visible = true
@@ -237,7 +240,7 @@ function ImGrokUI.EndColumns()
     ImGrokUI.State.CurrentColumn = 0
 end
 
--- Window Begin (expanded with SetNextPos/Size, docking)
+-- Window Begin (expanded with SetNextPos/Size, docking – sigma fix for DragData nil)
 function ImGrokUI.BeginWindow(title, position, size, flags)
     local id = ImGrokUI.GetID(title)
     local win = ImGrokUI.State.Windows[id]
@@ -259,7 +262,7 @@ function ImGrokUI.BeginWindow(title, position, size, flags)
         ImGrokUI.Animate(win.Titlebar, {BackgroundTransparency = 0}, Enum.EasingStyle.Sine)
         local titleLabel = Instance.new("TextLabel")
         titleLabel.Text = title
-        titleLabel.Font = ImGrokUI.State.Fonts.Bold.Face -- Fix
+        titleLabel.Font = ImGrokUI.State.Fonts.Bold  -- Sigma fix: Use Font property proper
         titleLabel.TextColor3 = ImGrokUI.State.Theme.TextColor
         titleLabel.BackgroundTransparency = 1
         titleLabel.Size = UDim2.new(1, -60, 1, 0) -- Space for buttons
@@ -270,14 +273,33 @@ function ImGrokUI.BeginWindow(title, position, size, flags)
         if not win.Flags.NoClose then
             local closeBtn = Instance.new("TextButton")
             closeBtn.Text = "X"
-            -- ... (same as before, but add scale anim on hover)
+            closeBtn.Font = ImGrokUI.State.Fonts.Bold
+            closeBtn.TextColor3 = ImGrokUI.State.Theme.TextColor
+            closeBtn.BackgroundColor3 = ImGrokUI.State.Theme.AccentColor
+            closeBtn.Size = UDim2.new(0, 30, 1, 0)
+            closeBtn.Position = UDim2.new(1, -30, 0, 0)
+            closeBtn.Parent = win.Titlebar
+            local cornerBtn = Instance.new("UICorner")
+            cornerBtn.CornerRadius = UDim.new(0, ImGrokUI.State.Theme.CornerRadius)
+            cornerBtn.Parent = closeBtn
+            closeBtn.MouseButton1Click:Connect(function()
+                win.Frame:Destroy()
+                ImGrokUI.State.Windows[id] = nil
+            end)
+            -- Hover anim
             closeBtn.MouseEnter:Connect(function()
-                ImGrokUI.Animate(closeBtn, {Scale = 1.1}, Enum.EasingStyle.Bounce) -- New scale anim
+                ImGrokUI.Animate(closeBtn, {BackgroundColor3 = ImGrokUI.State.Theme.HoverColor})
+            end)
+            closeBtn.MouseLeave:Connect(function()
+                ImGrokUI.Animate(closeBtn, {BackgroundColor3 = ImGrokUI.State.Theme.AccentColor})
+            end)
+            -- Scale anim sigma
+            closeBtn.MouseEnter:Connect(function()
+                ImGrokUI.Animate(closeBtn, {Scale = 1.1}, Enum.EasingStyle.Bounce)
             end)
             closeBtn.MouseLeave:Connect(function()
                 ImGrokUI.Animate(closeBtn, {Scale = 1.0})
             end)
-            -- (rest same)
         end
 
         -- Content with scroll if needed (new)
@@ -304,11 +326,68 @@ function ImGrokUI.BeginWindow(title, position, size, flags)
     ImGrokUI.State.CurrentWindow = win
     win.CurrentPos = UDim2.new(0, 5, 0, 5) -- Reset per frame
 
-    -- Dragging/Resizing (same, but add dock snap)
+    -- Dragging/Resizing (same, but add dock snap with nil guard)
+    if win.Flags.Draggable then
+        local dragging = false
+        local dragStart = nil
+        local startPos = nil
+        win.Titlebar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                dragStart = input.Position
+                startPos = win.Frame.Position
+                ImGrokUI.State.DragData = {ID = id}  -- Set drag data
+            end
+        end)
+        win.Titlebar.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+                ImGrokUI.State.DragData = nil  -- Clear
+            end
+        end)
+        RunService.RenderStepped:Connect(function()
+            if dragging then
+                local delta = UserInputService:GetMouseLocation() - dragStart
+                win.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                win.Frame.Position = win.Position
+            end
+        end)
+    end
+
+    if win.Flags.Resizable then
+        local resizeHandle = Instance.new("Frame")
+        resizeHandle.Size = UDim2.new(0, 20, 0, 20)
+        resizeHandle.Position = UDim2.new(1, -20, 1, -20)
+        resizeHandle.BackgroundTransparency = 1
+        resizeHandle.Parent = win.Frame
+        local resizing = false
+        local resizeStart = nil
+        local startSize = nil
+        resizeHandle.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                resizing = true
+                resizeStart = input.Position
+                startSize = win.Size
+            end
+        end)
+        resizeHandle.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                resizing = false
+            end
+        end)
+        RunService.RenderStepped:Connect(function()
+            if resizing then
+                local delta = UserInputService:GetMouseLocation() - resizeStart
+                win.Size = UDim2.new(startSize.X.Scale, math.max(100, startSize.X.Offset + delta.X), startSize.Y.Scale, math.max(100, startSize.Y.Offset + delta.Y))  -- Min size guard
+                win.Frame.Size = win.Size
+            end
+        end)
+    end
+
     if win.Flags.Dockable then
-        -- Basic docking: Snap to dock areas
-        if ImGrokUI.State.DragData and ImGrokUI.State.DragData.ID == id then
-            for _, dock in pairs(ImGrokUI.State.DockAreas) do
+        -- Basic docking: Snap to dock areas with nil guard
+        if ImGrokUI.State.DragData and ImGrokUI.State.DragData.ID == id then  -- Sigma fix: Nil check
+            for _, dock in pairs(ImGrokUI.State.DockAreas or {}) do  -- Guard empty
                 if math.abs(win.Position.X.Offset - dock.Position.X.Offset) < 20 then
                     win.DockedTo = dock.ID
                     win.Position = dock.Position + UDim2.new(0, dock.Size.X.Offset, 0, 0) -- Side dock example
@@ -316,8 +395,6 @@ function ImGrokUI.BeginWindow(title, position, size, flags)
             end
         end
     end
-
-    -- (dragging/resizing code same as before)
 
     return true
 end
@@ -354,18 +431,43 @@ function ImGrokUI.Button(label, size, disabled)
 
     local btnLabel = Instance.new("TextLabel")
     btnLabel.Text = ImGrokUI.State.Localization[label] or label -- i18n stub
-    btnLabel.Font = ImGrokUI.State.Fonts.Default.Face
-    -- (rest same)
+    btnLabel.Font = ImGrokUI.State.Fonts.Default
+    btnLabel.TextColor3 = ImGrokUI.State.Theme.TextColor
+    btnLabel.BackgroundTransparency = 1
+    btnLabel.Size = UDim2.new(1, 0, 1, 0)
+    btnLabel.TextXAlignment = Enum.TextXAlignment.Center
+    btnLabel.Parent = btnFrame
 
     if disabled then return false end
 
-    -- Interaction (same, but add tooltip call)
+    -- Interaction
+    local hovered = false
+    local clicked = false
     btnFrame.MouseEnter:Connect(function()
+        hovered = true
         ImGrokUI.State.HoveredItem = id
         ImGrokUI.Animate(btnFrame, {BackgroundColor3 = ImGrokUI.State.Theme.HoverColor})
-        ImGrokUI.SetTooltip("Click me daddy") -- Example
     end)
-    -- (rest same)
+    btnFrame.MouseLeave:Connect(function()
+        hovered = false
+        ImGrokUI.State.HoveredItem = nil
+        ImGrokUI.Animate(btnFrame, {BackgroundColor3 = ImGrokUI.State.Theme.MainColor})
+    end)
+    btnFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            ImGrokUI.State.ActiveItem = id
+            ImGrokUI.Animate(btnFrame, {BackgroundColor3 = ImGrokUI.State.Theme.ActiveColor}, Enum.EasingStyle.Bounce)
+            clicked = true
+        end
+    end)
+    btnFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and ImGrokUI.State.ActiveItem == id then
+            ImGrokUI.State.ActiveItem = nil
+            if hovered then
+                clicked = true
+            end
+        end
+    end)
 
     win.CurrentPos = win.CurrentPos + UDim2.new(0, 0, 0, size.Y.Offset + 5)
 
@@ -389,7 +491,27 @@ function ImGrokUI.ImageButton(label, imageId, size)
     img.Parent = imgFrame
 
     -- Interaction similar to button
-    -- ... (copy button logic, add scale anim on click)
+    local hovered = false
+    local clicked = false
+    imgFrame.MouseEnter:Connect(function()
+        hovered = true
+        ImGrokUI.Animate(imgFrame, {BackgroundColor3 = ImGrokUI.State.Theme.HoverColor})
+    end)
+    imgFrame.MouseLeave:Connect(function()
+        hovered = false
+        ImGrokUI.Animate(imgFrame, {BackgroundColor3 = ImGrokUI.State.Theme.MainColor})
+    end)
+    imgFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            ImGrokUI.Animate(imgFrame, {BackgroundColor3 = ImGrokUI.State.Theme.ActiveColor}, Enum.EasingStyle.Bounce)
+            clicked = true
+        end
+    end)
+    imgFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and hovered then
+            clicked = true
+        end
+    end)
 
     win.CurrentPos = win.CurrentPos + UDim2.new(0, 0, 0, size.Y.Offset + 5)
 
@@ -398,35 +520,227 @@ end
 
 -- SliderFloat (expanded with undo)
 function ImGrokUI.SliderFloat(label, value, min, max, format)
-    -- (same as before)
+    local id = ImGrokUI.GetID(label)
+    local win = ImGrokUI.State.CurrentWindow
+    if not win then return value end
+
+    local sliderFrame = ImGrokUI.CreateRoundedFrame(win.Content, UDim2.new(1, 0, 0, 30), win.CurrentPos, ImGrokUI.State.Theme.BackgroundColor, "Slider_" .. label)
+
+    local labelText = Instance.new("TextLabel")
+    labelText.Text = label .. ": " .. string.format(format or "%.2f", value)
+    labelText.Font = ImGrokUI.State.Fonts.Default
+    labelText.TextColor3 = ImGrokUI.State.Theme.TextColor
+    labelText.BackgroundTransparency = 1
+    labelText.Size = UDim2.new(1, 0, 1, 0)
+    labelText.Position = UDim2.new(0, 5, 0, 0)
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.Parent = sliderFrame
+
+    local track = ImGrokUI.CreateRoundedFrame(sliderFrame, UDim2.new(1, -10, 0, 6), UDim2.new(0, 5, 0.5, -3), ImGrokUI.State.Theme.BorderColor, "Track")
+
+    local fill = ImGrokUI.CreateRoundedFrame(track, UDim2.new((value - min) / (max - min), 0, 1, 0), UDim2.new(0, 0, 0, 0), ImGrokUI.State.Theme.MainColor, "Fill")
+
+    local knob = ImGrokUI.CreateRoundedFrame(sliderFrame, UDim2.new(0, 20, 1, 0), UDim2.new((value - min) / (max - min), -10, 0, 0), ImGrokUI.State.Theme.AccentColor, "Knob")
+    knob.ZIndex = 2
+
+    -- Dragging
+    local dragging = false
     local oldValue = value
-    value = -- logic
-    if value ~= oldValue then
-        table.insert(ImGrokUI.State.UndoStack, {ID = id, Type = "Slider", Old = oldValue, New = value})
-    end
+    knob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            ImGrokUI.State.ActiveItem = id
+            ImGrokUI.Animate(knob, {Size = UDim2.new(0, 25, 1, 5)}, Enum.EasingStyle.Bounce) -- Anim knob on grab
+        end
+    end)
+    knob.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+            ImGrokUI.State.ActiveItem = nil
+            ImGrokUI.Animate(knob, {Size = UDim2.new(0, 20, 1, 0)}) -- Reset anim
+            if value ~= oldValue then
+                table.insert(ImGrokUI.State.UndoStack, {ID = id, Type = "Slider", Old = oldValue, New = value})
+            end
+        end
+    end)
+    RunService.RenderStepped:Connect(function()
+        if dragging then
+            local mouseX = Mouse.X
+            local sliderLeft = sliderFrame.AbsolutePosition.X
+            local sliderWidth = sliderFrame.AbsoluteSize.X
+            local norm = math.clamp((mouseX - sliderLeft) / sliderWidth, 0, 1)
+            value = min + norm * (max - min)
+            fill.Size = UDim2.new(norm, 0, 1, 0)
+            knob.Position = UDim2.new(norm, -10, 0, 0)
+            labelText.Text = label .. ": " .. string.format(format or "%.2f", value)
+        end
+    end)
+
+    -- Hover anim
+    sliderFrame.MouseEnter:Connect(function()
+        ImGrokUI.Animate(track, {BackgroundColor3 = ImGrokUI.State.Theme.HoverColor})
+    end)
+    sliderFrame.MouseLeave:Connect(function()
+        ImGrokUI.Animate(track, {BackgroundColor3 = ImGrokUI.State.Theme.BorderColor})
+    end)
+
+    win.CurrentPos = win.CurrentPos + UDim2.new(0, 0, 0, 35)
+
     return value
 end
 
--- New: ProgressBar
-function ImGrokUI.ProgressBar(fraction, size)
+-- Checkbox (expanded with anim)
+function ImGrokUI.Checkbox(label, value)
+    local id = ImGrokUI.GetID(label)
     local win = ImGrokUI.State.CurrentWindow
-    if not win then return end
+    if not win then return value end
 
-    size = size or UDim2.new(1, 0, 0, 20)
-    local progFrame = ImGrokUI.CreateRoundedFrame(win.Content, size, win.CurrentPos, ImGrokUI.State.Theme.BackgroundColor, "Progress")
+    local checkFrame = ImGrokUI.CreateRoundedFrame(win.Content, UDim2.new(1, 0, 0, 30), win.CurrentPos, ImGrokUI.State.Theme.BackgroundColor, "Checkbox_" .. label)
 
-    local fill = ImGrokUI.CreateRoundedFrame(progFrame, UDim2.new(fraction, 0, 1, 0), UDim2.new(0, 0, 0, 0), ImGrokUI.State.Theme.MainColor, "Fill")
-    ImGrokUI.Animate(fill, {Size = UDim2.new(fraction, 0, 1, 0)}, Enum.EasingStyle.Linear) -- Anim progress
+    local box = ImGrokUI.CreateRoundedFrame(checkFrame, UDim2.new(0, 20, 0, 20), UDim2.new(0, 5, 0.5, -10), value and ImGrokUI.State.Theme.MainColor or ImGrokUI.State.Theme.BorderColor, "Box")
 
-    win.CurrentPos = win.CurrentPos + UDim2.new(0, 0, 0, 25)
+    local labelText = Instance.new("TextLabel")
+    labelText.Text = label
+    labelText.Font = ImGrokUI.State.Fonts.Default
+    labelText.TextColor3 = ImGrokUI.State.Theme.TextColor
+    labelText.BackgroundTransparency = 1
+    labelText.Size = UDim2.new(1, -30, 1, 0)
+    labelText.Position = UDim2.new(0, 30, 0, 0)
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.Parent = checkFrame
+
+    local clicked = false
+    checkFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            value = not value
+            clicked = true
+            box.BackgroundColor3 = value and ImGrokUI.State.Theme.MainColor or ImGrokUI.State.Theme.BorderColor
+            ImGrokUI.Animate(box, {Size = UDim2.new(0, 25, 0, 25)}, Enum.EasingStyle.Bounce, 0.1)
+            task.wait(0.1)
+            ImGrokUI.Animate(box, {Size = UDim2.new(0, 20, 0, 20)})
+        end
+    end)
+
+    -- Hover
+    checkFrame.MouseEnter:Connect(function()
+        ImGrokUI.Animate(box, {BackgroundColor3 = value and ImGrokUI.State.Theme.HoverColor or ImGrokUI.State.Theme.HoverColor})
+    end)
+    checkFrame.MouseLeave:Connect(function()
+        ImGrokUI.Animate(box, {BackgroundColor3 = value and ImGrokUI.State.Theme.MainColor or ImGrokUI.State.Theme.BorderColor})
+    end)
+
+    win.CurrentPos = win.CurrentPos + UDim2.new(0, 0, 0, 35)
+
+    return value, clicked
 end
 
--- Checkbox (same, add italic font option)
+-- InputText (expanded with focus anim)
+function ImGrokUI.InputText(label, text, flags)
+    local id = ImGrokUI.GetID(label)
+    local win = ImGrokUI.State.CurrentWindow
+    if not win then return text end
 
--- InputText (expanded with key bindings)
--- Add: ImGrokUI.RegisterKey("Enter", function() textBox:CaptureFocus() end) -- Example
+    local inputFrame = ImGrokUI.CreateRoundedFrame(win.Content, UDim2.new(1, 0, 0, 30), win.CurrentPos, ImGrokUI.State.Theme.BackgroundColor, "Input_" .. label)
 
--- Combo (expanded with search filter)
+    local textBox = Instance.new("TextBox")
+    textBox.Text = text
+    textBox.Font = ImGrokUI.State.Fonts.Default
+    textBox.TextColor3 = ImGrokUI.State.Theme.TextColor
+    textBox.BackgroundTransparency = 1
+    textBox.Size = UDim2.new(1, -5, 1, 0)
+    textBox.Position = UDim2.new(0, 5, 0, 0)
+    textBox.TextXAlignment = Enum.TextXAlignment.Left
+    textBox.Parent = inputFrame
+
+    textBox.FocusLost:Connect(function(enterPressed)
+        text = textBox.Text
+    end)
+
+    -- Anim on focus
+    textBox.Focused:Connect(function()
+        ImGrokUI.Animate(inputFrame, {BackgroundColor3 = ImGrokUI.State.Theme.HoverColor})
+    end)
+    textBox.FocusLost:Connect(function()
+        ImGrokUI.Animate(inputFrame, {BackgroundColor3 = ImGrokUI.State.Theme.BackgroundColor})
+    end)
+
+    win.CurrentPos = win.CurrentPos + UDim2.new(0, 0, 0, 35)
+
+    return text
+end
+
+-- Combo (dropdown)
+function ImGrokUI.Combo(label, selected, items)
+    local id = ImGrokUI.GetID(label)
+    local win = ImGrokUI.State.CurrentWindow
+    if not win then return selected end
+
+    local comboFrame = ImGrokUI.CreateRoundedFrame(win.Content, UDim2.new(1, 0, 0, 30), win.CurrentPos, ImGrokUI.State.Theme.MainColor, "Combo_" .. label)
+
+    local selectedText = Instance.new("TextLabel")
+    selectedText.Text = items[selected] or "Select"
+    selectedText.Font = ImGrokUI.State.Fonts.Default
+    selectedText.TextColor3 = ImGrokUI.State.Theme.TextColor
+    selectedText.BackgroundTransparency = 1
+    selectedText.Size = UDim2.new(1, -30, 1, 0)
+    selectedText.Position = UDim2.new(0, 5, 0, 0)
+    selectedText.TextXAlignment = Enum.TextXAlignment.Left
+    selectedText.Parent = comboFrame
+
+    local arrow = Instance.new("TextLabel")
+    arrow.Text = "▼"
+    arrow.Font = ImGrokUI.State.Fonts.Default
+    arrow.TextColor3 = ImGrokUI.State.Theme.TextColor
+    arrow.BackgroundTransparency = 1
+    arrow.Size = UDim2.new(0, 30, 1, 0)
+    arrow.Position = UDim2.new(1, -30, 0, 0)
+    arrow.Parent = comboFrame
+
+    local open = false
+    local dropdown = nil
+
+    comboFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            open = not open
+            if open then
+                dropdown = ImGrokUI.CreateRoundedFrame(ImGrokUI.State.ScreenGui, UDim2.new(comboFrame.AbsoluteSize.X / ImGrokUI.State.ScreenGui.AbsoluteSize.X, 0, 0, #items * 30), UDim2.new(0, comboFrame.AbsolutePosition.X, 0, comboFrame.AbsolutePosition.Y + comboFrame.AbsoluteSize.Y), ImGrokUI.State.Theme.BackgroundColor, "Dropdown")
+                dropdown.ZIndex = win.ZIndex + 1
+                for i, item in ipairs(items) do
+                    local itemBtn = ImGrokUI.CreateRoundedFrame(dropdown, UDim2.new(1, 0, 0, 30), UDim2.new(0, 0, 0, (i-1)*30), ImGrokUI.State.Theme.MainColor, "Item_" .. item)
+                    local itemText = Instance.new("TextLabel")
+                    itemText.Text = item
+                    itemText.Font = ImGrokUI.State.Fonts.Default
+                    itemText.TextColor3 = ImGrokUI.State.Theme.TextColor
+                    itemText.BackgroundTransparency = 1
+                    itemText.Size = UDim2.new(1, 0, 1, 0)
+                    itemText.Parent = itemBtn
+                    itemBtn.InputBegan:Connect(function(input2)
+                        if input2.UserInputType == Enum.UserInputType.MouseButton1 then
+                            selected = i
+                            selectedText.Text = item
+                            open = false
+                            if dropdown then dropdown:Destroy() end
+                        end
+                    end)
+                    -- Hover
+                    itemBtn.MouseEnter:Connect(function()
+                        ImGrokUI.Animate(itemBtn, {BackgroundColor3 = ImGrokUI.State.Theme.HoverColor})
+                    end)
+                    itemBtn.MouseLeave:Connect(function()
+                        ImGrokUI.Animate(itemBtn, {BackgroundColor3 = ImGrokUI.State.Theme.MainColor})
+                    end)
+                end
+                ImGrokUI.Animate(dropdown, {Size = UDim2.new(dropdown.Size.X, 0, 0, #items * 30)}, Enum.EasingStyle.Quad, 0.3) -- Slide anim
+            else
+                if dropdown then dropdown:Destroy() end
+            end
+        end
+    end)
+
+    win.CurrentPos = win.CurrentPos + UDim2.new(0, 0, 0, 35)
+
+    return selected
+end
 
 -- New: ListBox
 function ImGrokUI.ListBox(label, selected, items, height)
@@ -446,12 +760,23 @@ function ImGrokUI.ListBox(label, selected, items, height)
         local itemFrame = ImGrokUI.CreateRoundedFrame(scroll, UDim2.new(1, 0, 0, 30), UDim2.new(0, 0, 0, (i-1)*30), i == selected and ImGrokUI.State.Theme.ActiveColor or ImGrokUI.State.Theme.MainColor)
         local itemText = Instance.new("TextLabel")
         itemText.Text = item
-        -- (add click to select)
+        itemText.Font = ImGrokUI.State.Fonts.Default
+        itemText.TextColor3 = ImGrokUI.State.Theme.TextColor
+        itemText.BackgroundTransparency = 1
+        itemText.Size = UDim2.new(1, 0, 1, 0)
+        itemText.Parent = itemFrame
         itemFrame.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 selected = i
                 ImGrokUI.Animate(itemFrame, {BackgroundColor3 = ImGrokUI.State.Theme.ActiveColor})
             end
+        end)
+        -- Hover
+        itemFrame.MouseEnter:Connect(function()
+            ImGrokUI.Animate(itemFrame, {BackgroundColor3 = ImGrokUI.State.Theme.HoverColor})
+        end)
+        itemFrame.MouseLeave:Connect(function()
+            ImGrokUI.Animate(itemFrame, {BackgroundColor3 = i == selected and ImGrokUI.State.Theme.ActiveColor or ImGrokUI.State.Theme.MainColor})
         end)
     end
 
@@ -470,11 +795,18 @@ function ImGrokUI.TreeNode(label, open)
 
     local arrow = Instance.new("TextLabel")
     arrow.Text = open and "▼" or "▶"
+    arrow.Font = ImGrokUI.State.Fonts.Default
+    arrow.TextColor3 = ImGrokUI.State.Theme.TextColor
+    arrow.BackgroundTransparency = 1
     arrow.Size = UDim2.new(0, 20, 1, 0)
+    arrow.Position = UDim2.new(0, 0, 0, 0)
     arrow.Parent = nodeFrame
 
     local nodeLabel = Instance.new("TextLabel")
     nodeLabel.Text = label
+    nodeLabel.Font = ImGrokUI.State.Fonts.Default
+    nodeLabel.TextColor3 = ImGrokUI.State.Theme.TextColor
+    nodeLabel.BackgroundTransparency = 1
     nodeLabel.Position = UDim2.new(0, 25, 0, 0)
     nodeLabel.Size = UDim2.new(1, -25, 1, 0)
     nodeLabel.Parent = nodeFrame
@@ -520,11 +852,15 @@ function ImGrokUI.TabItem(label)
     local index = #tabBar.Tabs + 1
     local tabBtn = Instance.new("TextButton")
     tabBtn.Text = label
+    tabBtn.Font = ImGrokUI.State.Fonts.Default
+    tabBtn.TextColor3 = ImGrokUI.State.Theme.TextColor
     tabBtn.Size = UDim2.new(1/#tabBar.Tabs, 0, 1, 0) -- Approx
     tabBtn.Position = UDim2.new((index-1)/#tabBar.Tabs, 0, 0, 0)
     tabBtn.Parent = tabBar.Frame
     local selected = index == tabBar.Selected
     tabBtn.BackgroundColor3 = selected and ImGrokUI.State.Theme.ActiveColor or ImGrokUI.State.Theme.MainColor
+    local corner = Instance.new("UICorner")
+    corner.Parent = tabBtn
 
     tabBtn.MouseButton1Click:Connect(function()
         tabBar.Selected = index
@@ -590,7 +926,7 @@ end
 function ImGrokUI.OpenPopup(id)
     local pop = {ID = id, Open = true, Frame = ImGrokUI.CreateRoundedFrame(ImGrokUI.State.ScreenGui, UDim2.new(0, 200, 0, 100), UDim2.new(0, Mouse.X, 0, Mouse.Y), ImGrokUI.State.Theme.BackgroundColor)}
     table.insert(ImGrokUI.State.PopupStack, pop)
-    ImGrokUI.Animate(pop.Frame, {Position = UDim2.new(0, Mouse.X + 10, 0, Mouse.Y + 10)}, Enum.EasingStyle.Slide) -- Slide in
+    ImGrokUI.Animate(pop.Frame, {Position = UDim2.new(0, Mouse.X + 10, 0, Mouse.Y + 10)}, Enum.EasingStyle.Quad) -- Slide in
 end
 
 function ImGrokUI.BeginPopup(id)
@@ -636,9 +972,21 @@ function ImGrokUI.SetTooltip(text)
         tooltipFrame.Visible = false
         local tipText = Instance.new("TextLabel")
         tipText.Text = text
+        tipText.Font = ImGrokUI.State.Fonts.Default
+        tipText.TextColor3 = ImGrokUI.State.Theme.TextColor
+        tipText.BackgroundTransparency = 1
         tipText.Size = UDim2.new(1, 0, 1, 0)
         tipText.Parent = tooltipFrame
+        ImGrokUI.Animate(tooltipFrame, {Transparency = 0}, Enum.EasingStyle.Quad, 0.2) -- Fade in when timer hits
         ImGrokUI.State.Tooltip.Frame = tooltipFrame
+        RunService.RenderStepped:Connect(function()
+            if not ImGrokUI.State.HoveredItem and ImGrokUI.State.Tooltip.Frame then
+                ImGrokUI.Animate(tooltipFrame, {Transparency = 1}, Enum.EasingStyle.Quad, 0.2)
+                task.wait(0.2)
+                tooltipFrame:Destroy()
+                ImGrokUI.State.Tooltip.Frame = nil
+            end
+        end)
     end
 end
 
@@ -647,8 +995,18 @@ function ImGrokUI.ShowContextMenu(items)
     if UserInputService:IsMouseButtonPressed(Enum.MouseButton.Right) and not ImGrokUI.State.ContextMenu then
         local ctx = {Open = true, Frame = ImGrokUI.CreateRoundedFrame(ImGrokUI.State.ScreenGui, UDim2.new(0, 150, 0, #items*30), UDim2.new(0, Mouse.X, 0, Mouse.Y), ImGrokUI.State.Theme.BackgroundColor)}
         for i, item in ipairs(items) do
-            local itemBtn = ImGrokUI.Button(item, UDim2.new(1, 0, 0, 30))
-            -- Add click handler
+            local itemBtn = ImGrokUI.CreateRoundedFrame(ctx.Frame, UDim2.new(1, 0, 0, 30), UDim2.new(0, 0, 0, (i-1)*30), ImGrokUI.State.Theme.MainColor)
+            local itemText = Instance.new("TextLabel")
+            itemText.Text = item
+            itemText.Size = UDim2.new(1, 0, 1, 0)
+            itemText.Parent = itemBtn
+            itemBtn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    -- Handle item click (print or callback)
+                    print("Context: " .. item)
+                    ctx.Open = false
+                end
+            end)
         end
         ImGrokUI.State.ContextMenu = ctx
     end
@@ -667,10 +1025,18 @@ function ImGrokUI.ColorPicker(label, color)
     colorSquare.Size = UDim2.new(0, 50, 0, 50)
     colorSquare.BackgroundColor3 = color
     colorSquare.Parent = pickerFrame
+    local squareCorner = Instance.new("UICorner")
+    squareCorner.Parent = colorSquare
 
-    color.r = ImGrokUI.SliderFloat("R", color.r, 0, 1)
-    color.g = ImGrokUI.SliderFloat("G", color.g, 0, 1)
-    color.b = ImGrokUI.SliderFloat("B", color.b, 0, 1)
+    ImGrokUI.PushID("R")
+    color.R = ImGrokUI.SliderFloat("R", color.R, 0, 1)
+    ImGrokUI.PopID()
+    ImGrokUI.PushID("G")
+    color.G = ImGrokUI.SliderFloat("G", color.G, 0, 1)
+    ImGrokUI.PopID()
+    ImGrokUI.PushID("B")
+    color.B = ImGrokUI.SliderFloat("B", color.B, 0, 1)
+    ImGrokUI.PopID()
     colorSquare.BackgroundColor3 = color
 
     win.CurrentPos = win.CurrentPos + UDim2.new(0, 0, 0, 105)
@@ -678,10 +1044,42 @@ function ImGrokUI.ColorPicker(label, color)
     return color
 end
 
+-- New: ProgressBar
+function ImGrokUI.ProgressBar(fraction, size)
+    local win = ImGrokUI.State.CurrentWindow
+    if not win then return end
+
+    size = size or UDim2.new(1, 0, 0, 20)
+    local progFrame = ImGrokUI.CreateRoundedFrame(win.Content, size, win.CurrentPos, ImGrokUI.State.Theme.BackgroundColor, "Progress")
+
+    local fill = ImGrokUI.CreateRoundedFrame(progFrame, UDim2.new(fraction, 0, 1, 0), UDim2.new(0, 0, 0, 0), ImGrokUI.State.Theme.MainColor, "Fill")
+    ImGrokUI.Animate(fill, {Size = UDim2.new(fraction, 0, 1, 0)}, Enum.EasingStyle.Linear) -- Anim progress
+
+    win.CurrentPos = win.CurrentPos + UDim2.new(0, 0, 0, 25)
+end
+
+-- New: Text (simple label)
+function ImGrokUI.Text(text)
+    local win = ImGrokUI.State.CurrentWindow
+    if not win then return end
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Text = text
+    textLabel.Font = ImGrokUI.State.Fonts.Default
+    textLabel.TextColor3 = ImGrokUI.State.Theme.TextColor
+    textLabel.BackgroundTransparency = 1
+    textLabel.Size = UDim2.new(1, 0, 0, 20)
+    textLabel.Position = win.CurrentPos
+    textLabel.Parent = win.Content
+
+    win.CurrentPos = win.CurrentPos + UDim2.new(0, 0, 0, 25)
+end
+
 -- New: Theme Setters
 function ImGrokUI.SetThemeColor(key, color)
-    ImGrokUI.State.Theme[key] = color
-    -- Propagate to existing elements? (advanced, skip for now)
+    if ImGrokUI.State.Theme[key] then
+        ImGrokUI.State.Theme[key] = color
+    end
 end
 
 function ImGrokUI.SetGradientType(type) -- Linear/Radial
@@ -702,7 +1100,11 @@ end
 function ImGrokUI.Undo()
     if #ImGrokUI.State.UndoStack > 0 then
         local last = table.remove(ImGrokUI.State.UndoStack)
-        -- Revert based on type (e.g., set slider back to old)
+        -- Revert based on type (expand for more types)
+        if last.Type == "Slider" then
+            -- Would need to find the slider n set back, but stub for now
+            print("Undo slider to " .. last.Old)
+        end
     end
 end
 
@@ -716,10 +1118,5 @@ function ImGrokUI.SetLocalization(key, text)
     ImGrokUI.State.Localization[key] = text
 end
 
--- Error Handler Example
--- ImGrokUI.State.ErrorHandler("Test err")
-
--- ... (Even more bloat: Add plotting widget with lines/bars using frames, finance utils if needed, but stop here for response length)
-
--- End of lib, sigma daddy. Obediently expanded as u said.
+-- End of lib
 return ImGrokUI
